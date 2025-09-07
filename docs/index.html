@@ -46,30 +46,44 @@
   <style>
     :root{
       /* палитра */
-      --dark6: #1d1d1d;
-      --dark5: #2c2c2c;
-      --dark4: #383838;
+      --dark6: #141618;
+      --dark5: #1d2023;
+      --dark4: #262a2e;
       --dark3: #6c757d;
       --dark2: #ADB5BD;
       --dark1: #566176;
 
+      /* фирменный акцент */
+      --brand: #AAFF00;
+
       /* --- ПЕРЕМЕННЫЕ ОТСТУПОВ ДЛЯ ШАПКИ --- */
-      --logo-left-gap: 0px;            /* отступ от левого края до логотипа */
-      --logo-to-icons-gap: 20px;       /* от лого до первой иконки */
-      --left-icons-gap: 5px;           /* между иконками слева */
-      --left-to-board-gap: 20px;       /* от последних иконок до селектора плат */
-      --board-to-actions-gap: 30px;    /* между селектором и actions */
-      --actions-to-right-gap: 26px;    /* от actions до правых иконок */
-      --right-icons-gap: 12px;         /* между правыми иконками */
-      --right-edge-gap: 50px;          /* от последней правой иконки до края */
-      --topbar-h: 50px;                /* высота шапки */
+      --logo-left-gap: 10px;
+      --logo-to-icons-gap: 20px;
+      --left-icons-gap: 6px;
+      --left-to-board-gap: 20px;
+      --board-to-actions-gap: 26px;
+      --actions-to-right-gap: 26px;
+      --right-icons-gap: 12px;
+      --right-edge-gap: 18px;
+      --topbar-h: 56px;
+
+      /* тени и радиусы */
+      --shadow-1: 0 6px 20px rgba(0,0,0,.28);
+      --shadow-2: 0 2px 6px rgba(0,0,0,.35);
+      --shadow-3: 0 10px 30px rgba(0,0,0,.35);
+      --ring: 0 0 0 3px rgba(170,255,0,.25);
+      --r: 10px;
 
       /* цвета иконок */
-      --icon-color: #e6eef8;           /* базовый цвет иконок */
-      --icon-hover: #AAFF00;           /* цвет при наведении */
+      --icon-color: #e6eef8;
+      --icon-hover: var(--brand);
     }
 
-    html, body { overflow: hidden; }
+    @media (prefers-reduced-motion: reduce){
+      *{ animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+    }
+
+    html, body { overflow: hidden; background: var(--dark5); }
 
     /* скроллы blockly */
     .blocklyFlyout .blocklyScrollbarHandle { fill: #dddddd; }
@@ -82,26 +96,32 @@
     #mydiv{
       position: absolute; z-index: 10;
       width: 100%; height: 100%;
-      background: #fff; text-align: center;
+      background: var(--dark6); text-align: center;
     }
     .outer:before{ content:''; display:inline-block; height:100%; vertical-align:middle; }
     .inner{ display:inline-block; vertical-align:middle; }
     .outer{ text-align:center; }
 
-    /* СЕТКА ТОПБАРА */
+    /* ====== ШАПКА ====== */
     #topbar{
       position: fixed; inset: 0 0 auto 0;
       height: var(--topbar-h);
       display: grid;
       grid-template-columns: auto 1fr auto;
       align-items: center;
-      background: var(--dark6);
-      border: 1px solid var(--dark6);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,0)) ,
+        linear-gradient(180deg, var(--dark6), var(--dark5));
+      border-bottom: 1px solid rgba(255,255,255,.06);
       padding-left: var(--logo-left-gap);
       padding-right: var(--right-edge-gap);
+      backdrop-filter: saturate(120%) blur(8px);
+      -webkit-backdrop-filter: saturate(120%) blur(8px);
+      box-shadow: var(--shadow-1);
+      z-index: 9;
     }
 
-    /* левая группа: логотип + иконки */
+    /* левая группа */
     .left-group{
       display: inline-flex;
       align-items: center;
@@ -109,47 +129,62 @@
       height: 100%;
     }
 
-    /* логотип-кнопка */
+    /* логотип  */
     .b00{
-      width: 400px; height: 40px;
+      width: 320px; height: 40px;
       border: 0;
-      background: transparent url(media/menu/robologo.png) center/contain no-repeat;
+      background: transparent url(media/menu/robologo.png) left center/contain no-repeat;
       margin-right: var(--logo-to-icons-gap);
       padding: 0; outline: none;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,.25));
+      opacity: .95;
+      transition: opacity .18s ease, filter .18s ease;
     }
-    .b00:hover{ cursor: default; }
+    .b00:hover{
+      cursor: default;
+      opacity: 1;
+      filter: drop-shadow(0 8px 20px rgba(0,0,0,.35));
+    }
+    .b00:focus-visible{ box-shadow: var(--ring); border-radius: 6px; }
 
-    /* ЕДИНЫЙ СТИЛЬ ДЛЯ ВСЕХ PNG-ИКОНК */
+    /* иконки */
     .icon-btn{
-      /* размеры кнопки */
       width: 40px; height: 40px;
       border: 0; outline: none; padding: 0;
       background: transparent;
-
-      /* цвет иконки берётся из color (будет перекрашивать PNG) */
       color: var(--icon-color);
-      transition: color .15s ease, opacity .15s ease;
+      transition: color .18s ease, opacity .18s ease, transform .18s ease, box-shadow .18s ease;
       opacity: .95;
+      position: relative;
+      border-radius: 10px;
 
-      /* картинка применяется как маска (прозрачность PNG учитывается) */
-      --icon-url: none; /* заполняю ниже в классах b01.. */
+      --icon-url: none;
       -webkit-mask: var(--icon-url) center/23px 23px no-repeat;
               mask: var(--icon-url) center/23px 23px no-repeat;
-      background-color: currentColor; /* заливаю маску текущим цветом */
+      background-color: currentColor;
+      box-shadow: inset 0 -1px 0 rgba(255,255,255,.04), 0 1px 2px rgba(0,0,0,.25);
+    }
+    .icon-btn::before{
+      content:""; position:absolute; inset:-2px; border-radius:12px;
+      background: radial-gradient(40% 40% at 50% 35%, rgba(170,255,0,.18), rgba(170,255,0,0) 60%);
+      opacity: 0; transition: opacity .18s ease; pointer-events:none;
     }
     .icon-btn:hover{
-      color: var(--icon-hover); /* при наведении окраска в #AAFF00 */
-      opacity: 1;
+      color: var(--icon-hover); opacity: 1; transform: translateY(-1px);
+      box-shadow: inset 0 -1px 0 rgba(255,255,255,.06), 0 8px 18px rgba(0,0,0,.35);
     }
+    .icon-btn:hover::before{ opacity: .55; }
+    .icon-btn:active{ transform: translateY(0); box-shadow: inset 0 1px 0 rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.25); }
+    .icon-btn:focus-visible{ box-shadow: var(--ring), inset 0 -1px 0 rgba(255,255,255,.06), 0 8px 18px rgba(0,0,0,.35); }
 
-    /* привязка конкретных PNG к кнопкам */
+    /* привязка PNG */
     .b01{ --icon-url: url(media/menu/001.png); }
     .b02{ --icon-url: url(media/menu/002.png); }
-    #btn_fakeload{ --icon-url: url(media/menu/0002.png); } /* «Добавить проект» */
+    #btn_fakeload{ --icon-url: url(media/menu/0002.png); }
     .b03{ --icon-url: url(media/menu/003.png); }
     .b12{ --icon-url: url(media/menu/012.png); }
 
-    /* средняя группа: селектор плат + действия */
+    /* средняя группа */
     .mid-group{
       display: inline-flex;
       align-items: center;
@@ -159,7 +194,7 @@
       margin-left: var(--left-to-board-gap);
     }
 
-    /* селектор плат */
+    /* исходные цвета для SELECT */
     #boards.ard{
       background-color: var(--dark6);
       color: #fff;
@@ -167,29 +202,56 @@
       height: 26px;
       outline: none;
       width: 210px;
+      border-radius: 0;
+      box-shadow: none;
+      appearance: auto;
+      -webkit-appearance: menulist;
+      padding: 0 6px;
+      transition: none;
     }
     #boards.ard:hover{
       background-color: var(--dark3);
       color: #fff;
     }
+    #boards.ard:focus-visible{ outline: none; box-shadow: none; border: 0; }
     @media (max-width: 1130px){ #boards.ard{ width:100px; } }
 
-    /* блок действий: компиляция + загрузка */
+    /* действия */
     .actions{
       display: inline-flex;
       align-items: center;
       gap: 12px;
     }
     .tb-btn{
-      height: 28px;
-      padding: 0 12px;
-      border: 0;
-      border-radius: 4px;
-      background: #323232;
-      color: #fff;
-    }
+      --btn-bg: linear-gradient(180deg, #2e3237, #24272b);
+      --btn-bg-hover: linear-gradient(180deg, #353a40, #2a2e33);
+      --btn-text: #f2f6fa;
 
-    /* правая группа: две правые кнопки */
+      height: 36px;
+      padding: 0 16px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      font-weight: 600;
+      letter-spacing: .2px;
+      box-shadow: 0 1px 0 rgba(255,255,255,.05), 0 6px 16px rgba(0,0,0,.35);
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s ease;
+      outline: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-shadow: 0 1px 0 rgba(0,0,0,.35);
+    }
+    .tb-btn:hover{
+      background: var(--btn-bg-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 1px 0 rgba(255,255,255,.08), 0 12px 26px rgba(0,0,0,.45);
+      border-color: rgba(255,255,255,.18);
+    }
+    .tb-btn:active{ transform: translateY(0); box-shadow: 0 2px 8px rgba(0,0,0,.35) inset, 0 4px 10px rgba(0,0,0,.35); }
+
+    /* правая группа */
     .right-group{
       display: inline-flex;
       align-items: center;
@@ -201,8 +263,20 @@
     .b07{ --icon-url: url(media/menu/007.png); }
     .b08{ --icon-url: url(media/menu/008.png); }
 
+    /* контент под шапкой */
     #divBody{ position:absolute; top: var(--topbar-h); bottom:0; left:0; right:0; }
     .b13{ display:none !important; }
+
+    /* адаптив */
+    @media (max-width: 860px){
+      .b00{ width: 220px; }
+      :root{
+        --logo-to-icons-gap: 12px;
+        --left-to-board-gap: 12px;
+        --board-to-actions-gap: 16px;
+        --right-edge-gap: 12px;
+      }
+    }
   </style>
 </head>
 
@@ -214,17 +288,16 @@
   </script>
 
   <!-- Сплэш при загрузке -->
-  <div id="mydiv" style="padding:0;margin:0;background-color: var(--dark6);">
+  <div id="mydiv" style="padding:0;margin:0;">
     <div class="outer" style="height:100%; width: 100%;">
       <span class="inner">
-        <p align="center"><br><img src="./media/menu/splash.png" style="width:500px; height:150px;background:var(--dark6);"></p><br>
+        <p align="center"><br><img src="./media/menu/splash.png" style="width:500px; height:150px;"></p><br>
       </span>
     </div>
   </div>
 
-  <!-- TOPBAR НА ГРИДАХ -->
+  <!-- TOPBAR -->
   <div id="topbar">
-    <!-- левая группа: лого + иконки -->
     <div class="left-group">
       <button class="b00" aria-label="Логотип"></button>
       <button class="icon-btn b01" id="btn_new" title="Новый файл"></button>
@@ -235,7 +308,6 @@
       <button class="icon-btn b14" id="btn_example" style="display:none;"></button>
     </div>
 
-    <!-- средняя группа: селектор плат + кнопки компиляции/загрузки -->
     <div class="mid-group">
       <select id="boards" class="ard" onchange="BlocklyDuino.change_card();">
         <option value="pro8">Arduino Pro Mini 8MHz</option>
@@ -266,14 +338,13 @@
       </div>
     </div>
 
-    <!-- правая группа: две правые кнопки -->
     <div class="right-group">
       <button class="icon-btn b07" id="btn_term" title="Сериал порт"></button>
       <button class="icon-btn b08" id="btn_preview" title="ino Код"></button>
     </div>
   </div>
 
-  <!-- скрытый input для загрузки файлов -->
+  <!-- input для загрузки файлов -->
   <input type="file" id="load" style="display:none;" />
 
   <script>
@@ -446,7 +517,7 @@
   </script>
   <script src="js/web-api.js"></script>
 
-    <!-- Подключение робота -->
+  <!-- Подключение робота -->
   <script src="js/robot-walker.js"></script>
 
 </body>
