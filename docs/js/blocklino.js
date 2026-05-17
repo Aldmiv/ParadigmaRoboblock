@@ -6,10 +6,285 @@ BlocklyDuino.selectedCard = "nano";
 BlocklyDuino.content = "on";
 BlocklyDuino.workspace = null;
 
+BlocklyDuino.patchBlocklyDesktopEvents = function() {
+  if (!window.Blockly || !Blockly.Tooltip) {
+    return;
+  }
+
+  if (!Blockly.Tooltip.__roboblockDesktopPatch) {
+    Blockly.Tooltip.__roboblockDesktopPatch = true;
+
+    Blockly.Tooltip.onMouseOver_ = function(event) {
+      var element = event && event.target;
+      var hops = 0;
+
+      while (element &&
+             typeof element.tooltip !== 'string' &&
+             typeof element.tooltip !== 'function') {
+        element = element.tooltip || element.parentNode;
+
+        if (++hops > 30 || element === document || element === window) {
+          return;
+        }
+      }
+
+      if (!element) {
+        return;
+      }
+
+      if (Blockly.Tooltip.element_ !== element) {
+        Blockly.Tooltip.hide();
+        Blockly.Tooltip.poisonedElement_ = null;
+        Blockly.Tooltip.element_ = element;
+      }
+      clearTimeout(Blockly.Tooltip.mouseOutPid_);
+    };
+  }
+
+  if (Blockly.Touch && !Blockly.Touch.__roboblockMouseIdentifierPatch) {
+    Blockly.Touch.__roboblockMouseIdentifierPatch = true;
+    var originalCheckTouchIdentifier = Blockly.Touch.checkTouchIdentifier;
+
+    Blockly.Touch.checkTouchIdentifier = function(event) {
+      if (event && /^mouse/.test(event.type)) {
+        if (event.type === 'mousedown') {
+          Blockly.Touch.touchIdentifier_ = 'mouse';
+          return true;
+        }
+        if (event.type === 'mousemove' || event.type === 'mouseup') {
+          return Blockly.Touch.touchIdentifier_ === null ||
+                 Blockly.Touch.touchIdentifier_ === undefined ||
+                 Blockly.Touch.touchIdentifier_ === 'mouse';
+        }
+      }
+      return originalCheckTouchIdentifier.call(this, event);
+    };
+  }
+
+  if (Blockly.Flyout && Blockly.Flyout.prototype &&
+      !Blockly.Flyout.prototype.__roboblockOriginBlockPatch) {
+    Blockly.Flyout.prototype.__roboblockOriginBlockPatch = true;
+    var originalAddBlockListeners = Blockly.Flyout.prototype.addBlockListeners_;
+
+    Blockly.Flyout.prototype.addBlockListeners_ = function(svgRoot, block, rect) {
+      if (svgRoot) {
+        svgRoot.__roboblockOriginBlock = block;
+        svgRoot.__roboblockFlyout = this;
+      }
+      if (rect) {
+        rect.__roboblockOriginBlock = block;
+        rect.__roboblockFlyout = this;
+      }
+      return originalAddBlockListeners.call(this, svgRoot, block, rect);
+    };
+  }
+};
+
+BlocklyDuino.resizeBlockly = function() {
+  if (window.Blockly && BlocklyDuino.workspace && Blockly.svgResize) {
+    Blockly.svgResize(BlocklyDuino.workspace);
+  }
+};
+
+BlocklyDuino.installDirectFlyoutMouseDrag = function() {
+  if (!window.Blockly || !BlocklyDuino.workspace || BlocklyDuino.__directFlyoutMouseDragInstalled) {
+    return;
+  }
+  BlocklyDuino.__directFlyoutMouseDragInstalled = true;
+
+  var activeDrag = null;
+
+  function findFlyoutBlock(target) {
+    var node = target;
+    var hops = 0;
+    while (node && node !== document && hops++ < 30) {
+      if (node.__roboblockOriginBlock && node.__roboblockFlyout) {
+        return {
+          block: node.__roboblockOriginBlock,
+          flyout: node.__roboblockFlyout
+        };
+      }
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  function stopEvent(event) {
+    if (!event) {
+      return;
+    }
+    if (event.preventDefault) {
+      event.preventDefault();
+    }
+    if (event.stopPropagation) {
+      event.stopPropagation();
+    }
+    if (event.stopImmediatePropagation) {
+      event.stopImmediatePropagation();
+    }
+  }
+
+  function mouseEventLike(event, type) {
+    return {
+      type: type,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      button: typeof event.button === 'number' ? event.button : 0,
+      buttons: type === 'mouseup' ? 0 : 1,
+      target: event.target,
+      altKey: !!event.altKey,
+      ctrlKey: !!event.ctrlKey,
+      metaKey: !!event.metaKey,
+      shiftKey: !!event.shiftKey,
+      stopPropagation: function() {},
+      preventDefault: function() {}
+    };
+  }
+
+  function initBlocklyDrag(block, startEvent) {
+    block.workspace.updateScreenCalculationsIfScrolled();
+    block.workspace.markFocused();
+    block.select();
+    Blockly.hideChaff();
+
+    if (Blockly.Events && !Blockly.Events.getGroup()) {
+      Blockly.Events.setGroup(true);
+    }
+
+    Blockly.Css.setCursor(Blockly.Css.Cursor.CLOSED);
+    block.dragStartXY_ = block.getRelativeToSurfaceXY();
+    block.workspace.startDrag(mouseEventLike(startEvent, 'mousedown'), block.dragStartXY_);
+    Blockly.dragMode_ = Blockly.DRAG_FREE;
+    block.workspace.setResizesEnabled(false);
+
+    block.draggedBubbles_ = [];
+    var descendants = block.getDescendants();
+    for (var i = 0, descendant; descendant = descendants[i]; i++) {
+      var icons = descendant.getIcons();
+      for (var j = 0; j < icons.length; j++) {
+        var location = icons[j].getIconLocation();
+        location.bubble = icons[j];
+        block.draggedBubbles_.push(location);
+      }
+    }
+
+    block.setDragging_(true);
+  }
+
+  function createBlockFromFlyout(flyoutInfo, event) {
+    var originBlock = flyoutInfo.block;
+    var flyout = flyoutInfo.flyout;
+    var newBlock = null;
+
+    Blockly.terminateDrag_();
+    Blockly.hideChaff(true);
+    Blockly.Touch && Blockly.Touch.clearTouchIdentifier();
+
+    Blockly.Events.disable();
+    try {
+      newBlock = flyout.placeNewBlock_(originBlock);
+    } finally {
+      Blockly.Events.enable();
+    }
+
+    if (Blockly.Events.isEnabled()) {
+      Blockly.Events.setGroup(true);
+      Blockly.Events.fire(new Blockly.Events.Create(newBlock));
+    }
+
+    if (flyout.autoClose) {
+      flyout.hide();
+    } else {
+      flyout.filterForCapacity_();
+    }
+
+    initBlocklyDrag(newBlock, event);
+    return newBlock;
+  }
+
+  function onDown(event) {
+    if (event.type === 'pointerdown' && event.pointerType && event.pointerType !== 'mouse') {
+      return;
+    }
+    if (typeof event.button === 'number' && event.button !== 0) {
+      return;
+    }
+    if (activeDrag) {
+      stopEvent(event);
+      return;
+    }
+
+    var flyoutInfo = findFlyoutBlock(event.target);
+    if (!flyoutInfo || !flyoutInfo.block || flyoutInfo.block.disabled) {
+      return;
+    }
+
+    stopEvent(event);
+
+    try {
+      if (event.target && event.target.setPointerCapture && event.pointerId !== undefined) {
+        event.target.setPointerCapture(event.pointerId);
+      }
+    } catch (ignore) {}
+
+    try {
+      activeDrag = {
+        block: createBlockFromFlyout(flyoutInfo, event),
+        pointerId: event.pointerId
+      };
+      // Put the new block under the cursor immediately, then continue on moves.
+      activeDrag.block.onMouseMove_(mouseEventLike(event, 'mousemove'));
+    } catch (error) {
+      activeDrag = null;
+      console.error('Roboblock direct flyout drag failed:', error);
+      Blockly.terminateDrag_();
+    }
+  }
+
+  function onMove(event) {
+    if (!activeDrag || !activeDrag.block) {
+      return;
+    }
+    if (activeDrag.pointerId !== undefined && event.pointerId !== undefined &&
+        activeDrag.pointerId !== event.pointerId) {
+      return;
+    }
+    stopEvent(event);
+    activeDrag.block.onMouseMove_(mouseEventLike(event, 'mousemove'));
+  }
+
+  function onUp(event) {
+    if (!activeDrag || !activeDrag.block) {
+      return;
+    }
+    if (activeDrag.pointerId !== undefined && event.pointerId !== undefined &&
+        activeDrag.pointerId !== event.pointerId) {
+      return;
+    }
+    stopEvent(event);
+    var block = activeDrag.block;
+    activeDrag = null;
+    block.onMouseUp_(mouseEventLike(event, 'mouseup'));
+    Blockly.Touch && Blockly.Touch.clearTouchIdentifier();
+  }
+
+  document.addEventListener('pointerdown', onDown, true);
+  document.addEventListener('pointermove', onMove, true);
+  document.addEventListener('pointerup', onUp, true);
+  document.addEventListener('pointercancel', onUp, true);
+
+  document.addEventListener('mousedown', onDown, true);
+  document.addEventListener('mousemove', onMove, true);
+  document.addEventListener('mouseup', onUp, true);
+};
+
+
 BlocklyDuino.init = function() {
+	BlocklyDuino.patchBlocklyDesktopEvents();
 	Code.initLanguage();
 	BlocklyDuino.loadConfig();
 	BlocklyDuino.workspace = Blockly.inject('content_blocks',{grid:{snap:true},sounds:true,media:'media/',toolbox:BlocklyDuino.buildToolbox(),zoom:{controls:true,wheel:true}});
+	BlocklyDuino.installDirectFlyoutMouseDrag();
 	BlocklyDuino.workspace.addChangeListener(function () {
 		const $btn = $('#btn_compile');
 		if ($btn.hasClass('btn-success')) {
@@ -20,6 +295,11 @@ BlocklyDuino.init = function() {
 	BlocklyDuino.workspace.render();
 	BlocklyDuino.workspace.addChangeListener(BlocklyDuino.renderArduinoCodePreview);
 	BlocklyDuino.loadFile();
+	BlocklyDuino.resizeBlockly();
+	setTimeout(BlocklyDuino.resizeBlockly, 0);
+	setTimeout(BlocklyDuino.resizeBlockly, 250);
+	window.addEventListener('resize', BlocklyDuino.resizeBlockly, false);
+	$('a[data-toggle="tab"]').on('shown.bs.tab', BlocklyDuino.resizeBlockly);
 	window.addEventListener('pagehide', BlocklyDuino.backupBlocks, false);
 document.addEventListener('visibilitychange', function () {
   if (document.visibilityState === 'hidden') {
@@ -617,6 +897,7 @@ BlocklyDuino.bindFunctions = function() {
 			window.localStorage.content="off"
 		} else {
 			$('a[href="#content_blocks"]').tab('show');
+			setTimeout(BlocklyDuino.resizeBlockly, 0);
 			$('#btn_print').removeClass("hidden");
 			$('#btn_preview').removeClass("hidden");
 			$('#btn_search').addClass("hidden");

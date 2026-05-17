@@ -280,3 +280,24 @@ body {
 .blocklyText{
   fill: #000000 !important;
 }
+
+
+#content_blocks,
+#content_blocks .blocklySvg,
+#content_blocks .blocklyFlyout,
+#content_blocks .blocklyBlockCanvas,
+#content_blocks .blocklyDraggable {
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+
+#content_blocks,
+#content_blocks .blocklySvg,
+#content_blocks .blocklyFlyout,
+#content_blocks .blocklyBlockCanvas,
+#content_blocks .blocklyDraggable {
+  touch-action: none;
+}
